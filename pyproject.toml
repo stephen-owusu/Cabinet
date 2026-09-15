@@ -22,3 +22,13 @@ dev = [
     "ruff>=0.8",
     "mypy>=1.13",
 ]
+[tool.mypy]
+python_version = "3.12"
+namespace_packages = true
+explicit_package_bases = true
+mypy_path = ["packages/core/src"]
+
+disallow_untyped_defs = true
+warn_unused_configs = true
+warn_redundant_casts = true
+show_error_codes = true
