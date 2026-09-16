@@ -1,0 +1,50 @@
+[importlinter]
+root_package = cip
+include_external_packages = True
+
+[importlinter:contract:layers]
+name = Layered architecture
+type = layers
+layers =
+    cip.bootstrap
+    cip.api | cip.evaluation
+    cip.agents
+    cip.tools
+    cip.retrieval | cip.ingestion
+    cip.core
+
+[importlinter:contract:core-depends-on-nothing-of-ours]
+name = Core depends on nothing else in this codebase
+type = forbidden
+source_modules =
+    cip.core
+forbidden_modules =
+    cip.retrieval
+    cip.ingestion
+    cip.tools
+    cip.agents
+    cip.evaluation
+    cip.api
+    cip.bootstrap
+
+[importlinter:contract:core-has-no-external-dependencies]
+name = Core depends on nothing but the standard library and pydantic
+type = forbidden
+source_modules =
+    cip.core
+forbidden_modules =
+    boto3
+    botocore
+    anthropic
+    openai
+    ollama
+    langchain
+    langgraph
+    chromadb
+    faiss
+    lancedb
+    fastapi
+    ragas
+    sentence_transformers
+    httpx
+allow_indirect_imports = False

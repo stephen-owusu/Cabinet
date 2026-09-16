@@ -5,6 +5,13 @@ description = "Consultation Intelligence Platform"
 requires-python = ">=3.12"
 dependencies = [
     "cip-core",
+    "cip-retrieval",
+    "cip-ingestion",
+    "cip-tools",
+    "cip-agents",
+    "cip-evaluation",
+    "cip-api",
+    "cip-bootstrap",
 ]
 
 [tool.uv]
@@ -15,18 +22,43 @@ members = ["packages/*"]
 
 [tool.uv.sources]
 cip-core = { workspace = true }
+cip-retrieval = { workspace = true }
+cip-ingestion = { workspace = true }
+cip-tools = { workspace = true }
+cip-agents = { workspace = true }
+cip-evaluation = { workspace = true }
+cip-api = { workspace = true }
+cip-bootstrap = { workspace = true }
 
 [dependency-groups]
 dev = [
     "pytest>=8.3",
+    "pytest-asyncio>=0.24",
     "ruff>=0.8",
     "mypy>=1.13",
+    "import-linter>=2.1",
 ]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+
 [tool.mypy]
 python_version = "3.12"
 namespace_packages = true
 explicit_package_bases = true
-mypy_path = ["packages/core/src"]
+mypy_path = [
+    "packages/core/src",
+    "packages/retrieval/src",
+    "packages/ingestion/src",
+    "packages/tools/src",
+    "packages/agents/src",
+    "packages/evaluation/src",
+    "packages/api/src",
+    "packages/bootstrap/src",
+]
 
 disallow_untyped_defs = true
 warn_unused_configs = true

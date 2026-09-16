@@ -1,0 +1,31 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Current file",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "env": { "CIP_RUN_MODE": "offline" }
+        },
+        {
+            "name": "pytest: Current file",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": ["${file}", "-v"],
+            "console": "integratedTerminal",
+            "env": { "CIP_RUN_MODE": "offline" }
+        },
+        {
+            "name": "pytest: All tests",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": ["tests", "-v"],
+            "console": "integratedTerminal",
+            "env": { "CIP_RUN_MODE": "offline" }
+        }
+    ]
+}

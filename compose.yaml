@@ -1,0 +1,16 @@
+# Placeholder local stack for CIP_RUN_MODE=local.
+#
+# Nothing in the codebase talks to these services yet - core.config only
+# knows about "offline" and "local" as names. This file exists so the
+# shape of the local stack is decided before the adapters that depend on
+# it are written.
+services:
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+
+volumes:
+  ollama-data:

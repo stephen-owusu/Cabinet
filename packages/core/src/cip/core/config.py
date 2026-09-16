@@ -14,9 +14,9 @@ from pathlib import Path
 class RunMode(StrEnum):
     """How the system is wired for this process."""
 
-    OFFLINE = "offline"   # recorded fixtures, no network, what tests use
-    LOCAL = "local"       # real local stack, ollama, local vector store
-    CLOUD = "cloud"       # managed services, not implemented yet
+    OFFLINE = "offline"  # recorded fixtures, no network, what tests use
+    LOCAL = "local"  # real local stack, ollama, local vector store
+    CLOUD = "cloud"  # managed services, not implemented yet
 
 
 class Settings:
