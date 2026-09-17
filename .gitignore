@@ -1,16 +1,16 @@
-.venv/
+/.venv/
 __pycache__/
 *.py[cod]
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .coverage
-htmlcov/
-dist/
-build/
+/htmlcov/
+/dist/
+/build/
 *.egg-info/
 
-data/
+/data/
 evals/reports/
 tests/fixtures/generated/
 .env
@@ -19,4 +19,4 @@ tests/fixtures/generated/
 
 /models/
 .DS_Store
-.idea/
+/.idea/
