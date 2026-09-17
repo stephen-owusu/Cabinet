@@ -12,6 +12,7 @@ build/
 
 data/
 evals/reports/
+tests/fixtures/generated/
 .env
 .env.*
 !.env.example

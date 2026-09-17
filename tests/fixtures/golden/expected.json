@@ -1,0 +1,11 @@
+{
+  "submissions_expected": 9,
+  "responses_expected": 11,
+  "empty_cells": 16,
+  "exact_duplicate_groups": [],
+  "campaigns": [],
+  "quarantine_expected": [
+    { "row": 7, "reason": "missing_response_id" },
+    { "row": 9, "reason": "duplicate_response_id" }
+  ]
+}

@@ -1,0 +1,48 @@
+# Same consultation as manifest.yaml, but the "Organisation" column that
+# exists in export.csv has been left out of `columns` on purpose. The
+# agreed rule is that an undeclared column is an ingestion error, never a
+# silent include or exclude - this file is the fixture for that case.
+# It is still a structurally valid Manifest on its own; the missing
+# column only becomes a problem once it is checked against export.csv,
+# which is the future parser's job, not the Manifest model's.
+version: 1
+consultation: golden-consultation
+title: "Golden Fixture Consultation"
+source: csv
+encoding: utf-8
+sheet: null
+columns:
+  "Response ID":
+    role: submission_id
+  "Submitted":
+    role: submitted_at
+  "Name":
+    role: identity
+    handling: drop
+  "Email":
+    role: identity
+    handling: hash
+  "Postcode":
+    role: identity
+    handling: coarsen
+  "Are you responding as an individual or on behalf of an organisation?":
+    role: respondent_type
+  "What do you think of the proposal overall?":
+    role: free_text
+    question: q1
+  "Do you have any comments on the proposed timeline?":
+    role: free_text
+    question: q2
+  "Is there anything else you would like to add?":
+    role: free_text
+    question: q3
+questions:
+  - key: q1
+    text: "What do you think of the proposal overall?"
+    position: 0
+  - key: q2
+    text: "Do you have any comments on the proposed timeline?"
+    position: 1
+  - key: q3
+    text: "Is there anything else you would like to add?"
+    position: 2
