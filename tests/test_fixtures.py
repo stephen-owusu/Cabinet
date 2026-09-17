@@ -8,12 +8,16 @@ independent recomputation, not against generate.py's own bookkeeping.
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
+import tracemalloc
 from pathlib import Path
 
 import pytest
 import yaml
-from cip.core.models import Manifest
+from cip.core.models import Manifest, Response, Submission, ValidatedManifest
+from cip.ingestion.inspect import validate_manifest_against_source
+from cip.ingestion.parsers.tabular import QuarantineRecord, parse_export
 from fixtures.generate import generate_export
 
 GOLDEN_DIR = Path(__file__).resolve().parent / "fixtures" / "golden"
@@ -43,10 +47,10 @@ def _derive_ground_truth(csv_path: Path, manifest: Manifest) -> dict:
     for i, row in enumerate(rows, start=1):
         response_id_value = (row.get("Response ID") or "").strip()
         if response_id_value == "":
-            quarantine.append({"row": i, "reason": "missing_response_id"})
+            quarantine.append({"row": i, "reason": "missing_submission_id"})
             continue
         if response_id_value in seen_ids:
-            quarantine.append({"row": i, "reason": "duplicate_response_id"})
+            quarantine.append({"row": i, "reason": "duplicate_submission_id"})
             continue
         seen_ids.add(response_id_value)
 
@@ -247,39 +251,99 @@ def test_edge_case_normal_unremarkable_row_is_present(golden_rows):
     assert all(cell.strip() != "" for cell in free_text)
 
 
-# --- pipeline: not built yet, intent recorded --------------------------------
+# --- pipeline: the parser, exercised end to end -----------------------------
 
 
-@pytest.mark.skip(reason="pipeline not built yet")
+def _validated_golden_manifest() -> ValidatedManifest:
+    manifest = _load_manifest(GOLDEN_DIR / "manifest.yaml")
+    raw = (GOLDEN_DIR / "export.csv").read_bytes()
+    manifest = manifest.model_copy(update={"source_sha256": hashlib.sha256(raw).hexdigest()})
+    result = validate_manifest_against_source(manifest, GOLDEN_DIR / "export.csv")
+    assert isinstance(result, ValidatedManifest), result
+    return result
+
+
 def test_correctness_golden_file_produces_exact_submission_and_response_counts():
-    """Ingest tests/fixtures/golden/export.csv with manifest.yaml and
-    assert the resulting submission and response counts match
-    expected.json exactly.
-    """
-    pytest.fail("pipeline not built yet")
+    validated = _validated_golden_manifest()
+    expected = json.loads((GOLDEN_DIR / "expected.json").read_text(encoding="utf-8"))
+
+    submissions = 0
+    responses = 0
+    for item in parse_export(validated, GOLDEN_DIR / "export.csv"):
+        if isinstance(item, Submission):
+            submissions += 1
+        elif isinstance(item, Response):
+            responses += 1
+
+    assert submissions == expected["submissions_expected"]
+    assert responses == expected["responses_expected"]
 
 
-@pytest.mark.skip(reason="pipeline not built yet")
 def test_idempotency_ingesting_twice_produces_identical_ids_and_no_duplication():
-    """Run ingestion over the same export twice and assert the second
-    run produces exactly the same ids as the first, with no duplicate
-    submissions or responses.
+    """Ids are content-addressed, derived from the submission id column's
+    own value rather than the row's position - this is where that
+    actually has to hold, not just where it's declared.
     """
-    pytest.fail("pipeline not built yet")
+    validated = _validated_golden_manifest()
+
+    def collect_ids() -> list[str]:
+        return [
+            item.id
+            for item in parse_export(validated, GOLDEN_DIR / "export.csv")
+            if isinstance(item, Submission | Response)
+        ]
+
+    first = collect_ids()
+    second = collect_ids()
+
+    assert first == second
+    assert len(first) == len(set(first))  # no duplication within a single run either
 
 
-@pytest.mark.skip(reason="pipeline not built yet")
-def test_streaming_fifty_thousand_rows_keeps_peak_memory_flat():
-    """Generate a 50,000-row export, ingest it, and assert peak memory
-    measured with tracemalloc does not scale with row count.
+def test_streaming_fifty_thousand_rows_keeps_peak_memory_flat(tmp_path):
+    """A ceiling, not a ratio: comparing peak memory at 500 rows against
+    peak memory at 50,000 rows would still pass if both were already
+    buffering everything, just at two different, equally-wrong sizes.
+    A fixed ceiling only passes if the implementation is actually
+    streaming, on any machine this happens to run on.
     """
-    pytest.fail("pipeline not built yet")
+    out_dir = tmp_path / "streaming"
+    generate_export(rows=50_000, seed=13, out_dir=out_dir)
+
+    manifest = _load_manifest(out_dir / "manifest.yaml")
+    validated = validate_manifest_against_source(manifest, out_dir / "export.csv")
+    assert isinstance(validated, ValidatedManifest), validated
+
+    tracemalloc.start()
+    try:
+        count = 0
+        for _ in parse_export(validated, out_dir / "export.csv"):
+            count += 1
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+
+    assert count > 0
+
+    ceiling = 30 * 1024 * 1024  # 30 MiB - an export this size fully materialised is far larger
+    assert peak < ceiling, (
+        f"peak traced memory was {peak / (1024 * 1024):.1f} MiB for {count} yielded "
+        f"records, ceiling is {ceiling / (1024 * 1024):.0f} MiB - parse_export may "
+        "have stopped streaming"
+    )
 
 
-@pytest.mark.skip(reason="pipeline not built yet")
 def test_quarantine_every_bad_row_quarantined_every_good_row_processed():
-    """Ingest the golden export and assert every row named in
-    expected.json's quarantine_expected is quarantined with the correct
-    reason, and every other row is still processed normally.
-    """
-    pytest.fail("pipeline not built yet")
+    validated = _validated_golden_manifest()
+    expected = json.loads((GOLDEN_DIR / "expected.json").read_text(encoding="utf-8"))
+
+    quarantines = []
+    submissions = 0
+    for item in parse_export(validated, GOLDEN_DIR / "export.csv"):
+        if isinstance(item, QuarantineRecord):
+            quarantines.append({"row": item.row, "reason": item.reason.value})
+        elif isinstance(item, Submission):
+            submissions += 1
+
+    assert quarantines == expected["quarantine_expected"]
+    assert submissions == expected["submissions_expected"]

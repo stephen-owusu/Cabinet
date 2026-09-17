@@ -123,3 +123,63 @@ class Manifest(BaseModel):
             for name, column in self.columns.items()
             if column.role is ColumnRole.FREE_TEXT and column.question is not None
         }
+
+
+_VALIDATION_PROOF = object()
+"""Module-private sentinel. Not exported - the only code that can supply
+it is validate_manifest_against_source, by design."""
+
+
+class ValidatedManifest(Manifest):
+    """A manifest proven ready for ingestion.
+
+    Manifest validates structurally even when a column is still
+    ColumnRole.UNKNOWN, by design: a draft has to be loadable and
+    inspectable before a human has finished reviewing it. That leaves a
+    gap between "this parses as a Manifest" and "this is safe to ingest
+    with" - and today that gap is closed only by every caller remembering
+    to run validate_manifest_against_source first. One of them will
+    forget, and the failure mode is silent: identity data flowing into
+    analysis because nothing stopped it.
+
+    ValidatedManifest closes the gap in the type system instead of in
+    someone's memory. The only way to obtain one is
+    validate_manifest_against_source(manifest, source_path), which
+    returns either a ValidatedManifest or a list[Problem], never both.
+    Constructing one any other way raises: a ValidatedManifest that
+    nothing has actually checked is a lie, and a lie that type-checks as
+    proof is worse than an unchecked Manifest, because it stops being
+    questioned. The parser's signature - parse_export(manifest:
+    ValidatedManifest, ...) - then makes passing a plain, unchecked
+    Manifest a type error, not a runtime hope.
+
+    Guarantees carried, all checked once by validate_manifest_against_source
+    and never re-checked here - a ValidatedManifest is a completed proof,
+    not a promise to verify itself again:
+      - no column is ColumnRole.UNKNOWN
+      - every column in the source file's header is declared in `columns`,
+        and every column declared in `columns` is present in the header
+      - `encoding` actually decodes the source file
+      - `source_sha256` is set and matches the source file's current sha256
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _require_validation_proof(cls, data: object) -> object:
+        if not isinstance(data, dict) or data.get("_proof") is not _VALIDATION_PROOF:
+            raise ValueError(
+                "ValidatedManifest cannot be constructed directly. Obtain one from "
+                "validate_manifest_against_source(manifest, source_path) - the only "
+                "place that has actually checked the guarantees this type carries."
+            )
+        return {k: v for k, v in data.items() if k != "_proof"}
+
+    @classmethod
+    def _construct(cls, manifest: Manifest) -> ValidatedManifest:
+        """The sanctioned construction path, used exclusively by
+        validate_manifest_against_source after every guarantee above has
+        been checked against `manifest` and its source file.
+        """
+        return cls.model_validate({**manifest.model_dump(), "_proof": _VALIDATION_PROOF})

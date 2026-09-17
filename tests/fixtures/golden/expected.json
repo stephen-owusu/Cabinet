@@ -5,7 +5,7 @@
   "exact_duplicate_groups": [],
   "campaigns": [],
   "quarantine_expected": [
-    { "row": 7, "reason": "missing_response_id" },
-    { "row": 9, "reason": "duplicate_response_id" }
+    { "row": 7, "reason": "missing_submission_id" },
+    { "row": 9, "reason": "duplicate_submission_id" }
   ]
 }

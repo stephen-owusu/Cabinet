@@ -29,8 +29,9 @@ from functools import partial
 from pathlib import Path
 from typing import TextIO
 
+import openpyxl
 import yaml
-from cip.core.models import ColumnRole, IdentityHandling, Manifest, SourceFormat
+from cip.core.models import ColumnRole, IdentityHandling, Manifest, SourceFormat, ValidatedManifest
 from cip.ingestion.sampling import Sample, read_sample, source_sha256
 
 # --- attachment limits ------------------------------------------------------
@@ -517,16 +518,51 @@ class Problem:
     message: str
 
 
-def validate_manifest_against_source(manifest: Manifest, source_path: Path) -> list[Problem]:
+def _read_header(manifest: Manifest, source_path: Path) -> tuple[str, ...] | None:
+    """The source's header row, or None if it could not be read - CSV can
+    fail to decode under the declared encoding; xlsx can fail to open as
+    a workbook at all, or name a sheet that does not exist.
+
+    For CSV this reads the whole file once to force the whole thing
+    through the declared encoding, not just the header line - "the
+    declared encoding decodes the file" has to mean the file, not the
+    first row of it, or a bad byte three thousand rows in would pass
+    validation here and only surface once the parser hits it.
+    """
+    if manifest.source is SourceFormat.CSV:
+        with source_path.open("r", newline="", encoding=manifest.encoding) as f:
+            f.read()
+        with source_path.open("r", newline="", encoding=manifest.encoding) as f:
+            return tuple(next(csv.reader(f), []))
+
+    workbook = openpyxl.load_workbook(source_path, read_only=True, data_only=True)
+    try:
+        sheet = workbook[manifest.sheet] if manifest.sheet else workbook.worksheets[0]
+        first_row = next(sheet.iter_rows(max_row=1, values_only=True), ())
+        return tuple("" if v is None else str(v) for v in first_row)
+    finally:
+        workbook.close()
+
+
+def validate_manifest_against_source(
+    manifest: Manifest, source_path: Path
+) -> ValidatedManifest | list[Problem]:
     """Preconditions ingestion must check before it runs.
 
     Manifest's own validators check internal consistency - does every
     free-text column name a real question, and so on - without knowing
     the source file exists. This checks the manifest against that file,
-    plus the one thing Manifest is deliberately permissive about: a
-    column can be role=unknown and still be a structurally valid
-    Manifest, because a draft in progress is not an error. It becomes
-    one the moment something tries to ingest with it.
+    plus the things Manifest is deliberately permissive about: a column
+    can be role=unknown and still be a structurally valid Manifest,
+    because a draft in progress is not an error - it becomes one the
+    moment something tries to ingest with it - and source_sha256 can be
+    None on a hand-authored manifest that has never been checked against
+    a file yet.
+
+    Returns a ValidatedManifest carrying every guarantee documented on
+    that type when there are no problems, or the list of problems found -
+    never both, and never an empty list paired with no ValidatedManifest,
+    since that would be the same silent gap this function exists to close.
 
     An undeclared column is always an error here, never a default:
     silently including it risks putting identity data into analysis,
@@ -538,15 +574,14 @@ def validate_manifest_against_source(manifest: Manifest, source_path: Path) -> l
 
     header: tuple[str, ...] | None
     try:
-        with source_path.open("r", newline="", encoding=manifest.encoding) as f:
-            header = tuple(next(csv.reader(f), []))
-    except (LookupError, UnicodeDecodeError) as exc:
+        header = _read_header(manifest, source_path)
+    except (LookupError, UnicodeDecodeError, OSError, KeyError) as exc:
         problems.append(
             Problem(
                 kind="encoding",
                 message=(
-                    f"declared encoding {manifest.encoding!r} does not decode "
-                    f"{source_path.name}: {exc}"
+                    f"could not read {source_path.name} as declared (encoding "
+                    f"{manifest.encoding!r}, source {manifest.source.value}): {exc}"
                 ),
             )
         )
@@ -587,20 +622,31 @@ def validate_manifest_against_source(manifest: Manifest, source_path: Path) -> l
                 )
             )
 
-    if manifest.source_sha256 is not None:
-        actual = source_sha256(raw)
-        if actual != manifest.source_sha256:
-            problems.append(
-                Problem(
-                    kind="changed_source",
-                    message=(
-                        f"{source_path.name} has changed since this manifest was written "
-                        f"(expected sha256 {manifest.source_sha256}, got {actual})"
-                    ),
-                )
+    actual = source_sha256(raw)
+    if manifest.source_sha256 is None:
+        problems.append(
+            Problem(
+                kind="missing_source_sha256",
+                message=(
+                    "manifest has no source_sha256 recorded, so it cannot be proven to "
+                    f"match {source_path.name} - re-run inspect or set it to {actual!r}"
+                ),
             )
+        )
+    elif actual != manifest.source_sha256:
+        problems.append(
+            Problem(
+                kind="changed_source",
+                message=(
+                    f"{source_path.name} has changed since this manifest was written "
+                    f"(expected sha256 {manifest.source_sha256}, got {actual})"
+                ),
+            )
+        )
 
-    return problems
+    if problems:
+        return problems
+    return ValidatedManifest._construct(manifest)
 
 
 def load_manifest(path: Path) -> Manifest:

@@ -39,6 +39,7 @@ dev = [
     "import-linter>=2.1",
     "pyyaml>=6.0",
     "types-pyyaml>=6.0",
+    "types-openpyxl>=3.1",
 ]
 
 [tool.pytest.ini_options]
@@ -65,4 +66,5 @@ mypy_path = [
 disallow_untyped_defs = true
 warn_unused_configs = true
 warn_redundant_casts = true
+warn_unused_ignores = true
 show_error_codes = true

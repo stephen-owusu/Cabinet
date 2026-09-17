@@ -21,15 +21,22 @@ def _digest(namespace: str, *parts: str) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def submission_id(consultation: str, source_sha: str, row_key: str) -> str:
+def submission_id(consultation: str, row_key: str) -> str:
     """Identity for one export row.
 
-    Keyed on the source file's hash and the row's position within it, so
-    the same row re-parsed from the same file always resolves to the same
-    submission, and a different export of the same consultation does not
-    collide with it.
+    Keyed on the consultation and the row key alone - not the source
+    file's hash. A submission's identity is who answered and which
+    consultation they answered, not which byte-for-byte file that answer
+    happened to be extracted from: the same respondent's row, saved once
+    as CSV and once as XLSX, or re-exported after an unrelated row
+    elsewhere in the file was edited, must resolve to the same
+    submission. Cross-consultation collision is already prevented by
+    `consultation`; row_key itself is expected to be stable and unique
+    within one consultation, because it is the export channel's own
+    persistent identifier for that submission (Citizen Space's Response
+    ID column), not a per-export counter.
     """
-    return f"submission_{_digest('submission', consultation, source_sha, row_key)}"
+    return f"submission_{_digest('submission', consultation, row_key)}"
 
 
 def response_id(submission: str, column: str) -> str:

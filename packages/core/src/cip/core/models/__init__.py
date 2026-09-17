@@ -25,7 +25,7 @@ from cip.core.models.ids import (
     response_id,
     submission_id,
 )
-from cip.core.models.manifest import ColumnSpec, Manifest, QuestionSpec
+from cip.core.models.manifest import ColumnSpec, Manifest, QuestionSpec, ValidatedManifest
 from cip.core.models.provenance import CellLocator, Locator, Provenance, SpanLocator
 from cip.core.models.response import Response
 from cip.core.models.submission import Respondent, Submission
@@ -51,6 +51,7 @@ __all__ = [
     "SpanLocator",
     "Submission",
     "TextQuality",
+    "ValidatedManifest",
     "attachment_id",
     "content_hash",
     "question_id",

@@ -301,10 +301,10 @@ def generate_export(rows: int, seed: int, out_dir: Path) -> GroundTruth:
         roll = rng.random()
         if roll < P_MISSING_ID:
             row_ids.append(None)
-            quarantine.append(QuarantinedRow(row=i + 1, reason="missing_response_id"))
+            quarantine.append(QuarantinedRow(row=i + 1, reason="missing_submission_id"))
         elif roll < P_MISSING_ID + P_DUPLICATE_ID and assigned_ids:
             row_ids.append(rng.choice(assigned_ids))
-            quarantine.append(QuarantinedRow(row=i + 1, reason="duplicate_response_id"))
+            quarantine.append(QuarantinedRow(row=i + 1, reason="duplicate_submission_id"))
         else:
             new_id = f"RESP-{i + 1:05d}"
             row_ids.append(new_id)
@@ -449,6 +449,7 @@ def generate_export(rows: int, seed: int, out_dir: Path) -> GroundTruth:
             {"key": key, "text": text, "position": position}
             for position, (key, text) in enumerate(QUESTIONS)
         ],
+        "source_sha256": source_sha256,
     }
     (out_dir / "manifest.yaml").write_text(
         yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8"

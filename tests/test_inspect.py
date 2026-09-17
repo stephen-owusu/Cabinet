@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 import yaml
-from cip.core.models import IdentityHandling, Manifest, SourceFormat
+from cip.core.models import IdentityHandling, Manifest, SourceFormat, ValidatedManifest
 from cip.core.models.enums import ColumnRole
 from cip.ingestion.inspect import (
     Problem,
@@ -342,9 +342,24 @@ def test_validate_passes_a_manifest_with_the_correct_hash():
     raw = (GOLDEN_DIR / "export.csv").read_bytes()
     correct = manifest.model_copy(update={"source_sha256": hashlib.sha256(raw).hexdigest()})
 
-    problems = validate_manifest_against_source(correct, GOLDEN_DIR / "export.csv")
+    result = validate_manifest_against_source(correct, GOLDEN_DIR / "export.csv")
 
-    assert not any(p.kind == "changed_source" for p in problems)
+    assert isinstance(result, ValidatedManifest)
+    assert result.consultation == correct.consultation
+
+
+def test_validate_requires_a_source_sha256_even_if_columns_are_otherwise_fine():
+    """A manifest that has never been checked against a file - hand
+    authored, source_sha256 still None - cannot be proven to match one,
+    so it cannot become a ValidatedManifest either.
+    """
+    manifest = load_manifest(GOLDEN_DIR / "manifest.yaml")
+    assert manifest.source_sha256 is None
+
+    problems = validate_manifest_against_source(manifest, GOLDEN_DIR / "export.csv")
+
+    assert not isinstance(problems, ValidatedManifest)
+    assert any(p.kind == "missing_source_sha256" for p in problems)
 
 
 # --- terminal output never prints a raw identity value -----------------------
