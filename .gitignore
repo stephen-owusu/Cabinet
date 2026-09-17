@@ -17,6 +17,6 @@ tests/fixtures/generated/
 .env.*
 !.env.example
 
-models/
+/models/
 .DS_Store
 .idea/

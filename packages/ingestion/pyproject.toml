@@ -5,10 +5,14 @@ description = "Parsing, cleaning and chunking of raw consultation documents."
 requires-python = ">=3.12"
 dependencies = [
     "cip-core",
+    "pyyaml>=6.0",
 ]
 
 [tool.uv.sources]
 cip-core = { workspace = true }
+
+[project.scripts]
+cip = "cip.ingestion.inspect:main"
 
 [build-system]
 requires = ["hatchling"]
